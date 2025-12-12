@@ -301,10 +301,11 @@ const ConsoleSimulator = ({ level }) => {
 const App = () => {
   const [currentLevelId, setCurrentLevelId] = useState(1);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [medals, setMedals] = useState(3); // Initial medals set to 3
+  const [medals, setMedals] = useState(3);
   const [secondsUntilNext, setSecondsUntilNext] = useState(120);
   const [unlockedHints, setUnlockedHints] = useState({});
   const [expandedHints, setExpandedHints] = useState({});
+  const [level1AllHintsUnlockedTime, setLevel1AllHintsUnlockedTime] = useState(null);
 
   const currentLevel = LEVELS.find(l => l.id === currentLevelId) || LEVELS[0];
 
@@ -346,8 +347,27 @@ const App = () => {
         );
         if (confirmUse) {
           setMedals(prev => prev - cost);
-          setUnlockedHints(prev => ({ ...prev, [hintId]: true }));
+          const nextUnlockedHints = { ...unlockedHints, [hintId]: true };
+          setUnlockedHints(nextUnlockedHints);
           setExpandedHints(prev => ({ ...prev, [hintId]: true }));
+
+          // レベル1のスペシャルヒント解放チェック
+          if (currentLevelId === 1) {
+            const level1Hints = LEVELS[0].hints;
+            // 最後のヒント以外（通常ヒント）が全て開いているかチェック
+            const normalHintCount = level1Hints.length - 1;
+            let allOpen = true;
+            for (let i = 0; i < normalHintCount; i++) {
+              if (!nextUnlockedHints[`l1-h${i}`]) {
+                allOpen = false;
+                break;
+              }
+            }
+            // 全て開いた瞬間を記録
+            if (allOpen && !level1AllHintsUnlockedTime) {
+              setLevel1AllHintsUnlockedTime(Date.now());
+            }
+          }
         }
       } else {
         alert(`ヒントメダルが足りません！\nあと ${formatTime(secondsUntilNext)} で回復します。`);
@@ -509,6 +529,17 @@ const App = () => {
             <div className="grid gap-4 md:grid-cols-2">
               {currentLevel.hints.map((hint, idx) => {
                 const hintId = `l${currentLevel.id}-h${idx}`;
+                
+                // レベル1のスペシャルヒント（最後）の表示制御
+                if (currentLevel.id === 1 && idx === currentLevel.hints.length - 1) {
+                  // まだ通常ヒントがコンプリートされていない、または時間が未設定なら非表示
+                  if (!level1AllHintsUnlockedTime) return null;
+                  
+                  // 2分 (120秒 * 1000ミリ秒) 経過していないなら非表示
+                  const timePassed = Date.now() - level1AllHintsUnlockedTime;
+                  if (timePassed < 120000) return null;
+                }
+
                 const isUnlocked = unlockedHints[hintId];
                 const isExpanded = expandedHints[hintId];
                 const cost = hint.cost || 1;
