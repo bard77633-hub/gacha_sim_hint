@@ -1,278 +1,56 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { 
+  Lightbulb, 
+  ChevronDown, 
+  ChevronRight,
+  Code2, 
+  CheckCircle2, 
+  Menu,
+  X,
+  Medal,
+  Timer,
+  Lock,
+  Unlock,
+  Play,
+  RotateCcw
+} from 'lucide-react';
 import { LEVELS } from './data.js';
 
-// State
-let state = {
-  currentLevelId: 1,
-  isSidebarOpen: false,
-  medals: 5,
-  secondsUntilNext: 120,
-  unlockedHints: {}, // { "l1-h0": true, ... }
-  expandedHints: {}, // { "l1-h0": true, ... }
-  isRunning: false
-};
+// --- Components ---
 
-// DOM Elements
-const elements = {
-  sidebar: document.getElementById('sidebar'),
-  sidebarOverlay: document.getElementById('sidebar-overlay'),
-  mobileMenuBtn: document.getElementById('mobile-menu-btn'),
-  sidebarCloseBtn: document.getElementById('sidebar-close-btn'),
-  
-  mobileMedalCount: document.getElementById('mobile-medal-count'),
-  mobileTimerDisplay: document.getElementById('mobile-timer-display'),
-  desktopMedalCount: document.getElementById('desktop-medal-count'),
-  desktopTimerDisplay: document.getElementById('desktop-timer-display'),
-  
-  levelList: document.getElementById('level-list'),
-  
-  levelBadge: document.getElementById('level-badge'),
-  levelTitle: document.getElementById('level-title'),
-  levelDescription: document.getElementById('level-description'),
-  goalList: document.getElementById('goal-list'),
-  
-  hintList: document.getElementById('hint-list'),
-  
-  runSimulationBtn: document.getElementById('run-simulation-btn'),
-  consoleOutput: document.getElementById('console-output'),
-  consolePlaceholder: document.getElementById('console-placeholder'),
-  consoleLogs: document.getElementById('console-logs'),
-};
+const ConsoleSimulator = ({ level }) => {
+  const [logs, setLogs] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const consoleEndRef = useRef(null);
 
-// Constants
-const MEDAL_RECOVERY_TIME = 120; // seconds
+  const addLog = (text, isSystem = false) => {
+    setLogs(prev => [...prev, { text, isSystem, id: Date.now() + Math.random() }]);
+  };
 
-// Initialize
-function init() {
-  renderSidebar();
-  renderLevelContent();
-  startTimer();
-  setupEventListeners();
-  // Initial Lucide render
-  lucide.createIcons();
-}
+  const scrollToBottom = () => {
+    consoleEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-// Timer Logic
-function startTimer() {
-  setInterval(() => {
-    if (state.secondsUntilNext <= 1) {
-      state.medals += 1;
-      state.secondsUntilNext = MEDAL_RECOVERY_TIME;
-      updateMedalDisplay();
-    } else {
-      state.secondsUntilNext -= 1;
-      updateTimerDisplay();
-    }
-  }, 1000);
-}
+  useEffect(() => {
+    scrollToBottom();
+  }, [logs]);
 
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
+  // レベルが変わったらログをクリア
+  useEffect(() => {
+    setLogs([]);
+    setIsRunning(false);
+  }, [level.id]);
 
-// UI Updates
-function updateMedalDisplay() {
-  elements.mobileMedalCount.textContent = state.medals;
-  elements.desktopMedalCount.textContent = state.medals;
-}
+  const runSimulation = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
+    setLogs([]);
+    addLog('> プログラムを実行中...', true);
 
-function updateTimerDisplay() {
-  const timeStr = formatTime(state.secondsUntilNext);
-  elements.mobileTimerDisplay.textContent = timeStr;
-  elements.desktopTimerDisplay.textContent = timeStr;
-}
+    // 非同期処理風に見せるための遅延
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-function renderSidebar() {
-  elements.levelList.innerHTML = '';
-  LEVELS.forEach(level => {
-    const btn = document.createElement('button');
-    const isCurrent = state.currentLevelId === level.id;
-    
-    btn.className = `
-      w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-between group
-      ${isCurrent 
-        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
-        : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
-    `;
-    
-    btn.innerHTML = `
-      <span>Lv.${level.id} ${level.simulationType === 'complex' ? 'レアリティ' : '基本'}</span>
-      ${isCurrent ? '<i data-lucide="chevron-right" class="w-4 h-4"></i>' : ''}
-    `;
-    
-    btn.onclick = () => handleLevelChange(level.id);
-    elements.levelList.appendChild(btn);
-  });
-  lucide.createIcons();
-}
-
-function renderLevelContent() {
-  const currentLevel = LEVELS.find(l => l.id === state.currentLevelId) || LEVELS[0];
-  
-  // Update Header
-  elements.levelBadge.textContent = currentLevel.id;
-  elements.levelTitle.textContent = currentLevel.title;
-  elements.levelDescription.textContent = currentLevel.description;
-  
-  // Update Goals
-  elements.goalList.innerHTML = '';
-  currentLevel.goals.forEach(goal => {
-    const li = document.createElement('li');
-    li.className = "flex items-start gap-3 text-slate-600";
-    li.innerHTML = `
-      <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-slate-300 mt-2.5"></span>
-      <span>${goal}</span>
-    `;
-    elements.goalList.appendChild(li);
-  });
-  
-  // Clear Console
-  clearConsole();
-  
-  // Render Hints
-  renderHints(currentLevel);
-}
-
-function renderHints(level) {
-  elements.hintList.innerHTML = '';
-  
-  level.hints.forEach((hint, idx) => {
-    const hintId = `l${level.id}-h${idx}`;
-    const isUnlocked = state.unlockedHints[hintId];
-    const isExpanded = state.expandedHints[hintId];
-    
-    const container = document.createElement('div');
-    container.className = `
-      border rounded-lg transition-all duration-300 overflow-hidden relative
-      ${isExpanded ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}
-      ${!isUnlocked ? 'hover:border-blue-300' : ''}
-    `;
-    
-    const headerBtn = document.createElement('button');
-    headerBtn.className = "w-full text-left px-5 py-4 flex items-center justify-between font-medium text-slate-700";
-    headerBtn.onclick = () => handleHintClick(hintId);
-    
-    const iconClass = isUnlocked 
-      ? "w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"
-      : "w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center";
-      
-    const iconName = isUnlocked ? "unlock" : "lock";
-    
-    const rightSide = isUnlocked
-      ? `<i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-amber-500' : 'text-slate-400'}"></i>`
-      : `<div class="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-600">
-           <i data-lucide="medal" class="w-3 h-3 text-amber-500"></i>
-           <span>-1</span>
-         </div>`;
-
-    headerBtn.innerHTML = `
-      <span class="flex items-center gap-2">
-        <span class="${iconClass}">
-          <i data-lucide="${iconName}" class="w-3.5 h-3.5"></i>
-        </span>
-        <span class="${!isUnlocked ? 'text-slate-500' : 'text-slate-800'}">
-          ${hint.title}
-        </span>
-      </span>
-      ${rightSide}
-    `;
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = `
-      accordion-content px-5 overflow-hidden
-      ${isExpanded ? 'max-h-60 pb-4 opacity-100' : 'max-h-0 opacity-0'}
-    `;
-    contentDiv.innerHTML = `
-      <p class="text-sm text-slate-600 leading-relaxed pl-8 border-l-2 border-amber-200 ml-3">
-        ${formatMarkdown(hint.content)}
-      </p>
-    `;
-    
-    container.appendChild(headerBtn);
-    container.appendChild(contentDiv);
-    elements.hintList.appendChild(container);
-  });
-  
-  lucide.createIcons();
-}
-
-// Simple markdown formatter for hints (handling code ticks)
-function formatMarkdown(text) {
-  return text.replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800 font-mono text-xs">$1</code>');
-}
-
-// Actions
-function handleLevelChange(id) {
-  state.currentLevelId = id;
-  // レベル変更時はヒントの開閉状態のみリセット、解放状態は維持
-  state.expandedHints = {};
-  
-  closeSidebar();
-  renderSidebar(); // Update active state
-  renderLevelContent();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function handleHintClick(hintId) {
-  if (state.unlockedHints[hintId]) {
-    // Toggle expand
-    state.expandedHints[hintId] = !state.expandedHints[hintId];
-  } else {
-    // Try unlock
-    if (state.medals > 0) {
-      if (confirm(`ヒントメダルを1枚消費してヒントを開きますか？\n(残りメダル: ${state.medals}枚)`)) {
-        state.medals--;
-        state.unlockedHints[hintId] = true;
-        state.expandedHints[hintId] = true;
-        updateMedalDisplay();
-      }
-    } else {
-      alert(`ヒントメダルが足りません！\nあと ${formatTime(state.secondsUntilNext)} で回復します。`);
-    }
-  }
-  const currentLevel = LEVELS.find(l => l.id === state.currentLevelId);
-  renderHints(currentLevel);
-}
-
-function toggleSidebar() {
-  state.isSidebarOpen = !state.isSidebarOpen;
-  if (state.isSidebarOpen) {
-    elements.sidebar.classList.remove('-translate-x-full');
-    elements.sidebarOverlay.classList.remove('hidden');
-  } else {
-    elements.sidebar.classList.add('-translate-x-full');
-    elements.sidebarOverlay.classList.add('hidden');
-  }
-}
-
-function closeSidebar() {
-  state.isSidebarOpen = false;
-  elements.sidebar.classList.add('-translate-x-full');
-  elements.sidebarOverlay.classList.add('hidden');
-}
-
-// Simulator Logic
-function clearConsole() {
-  elements.consolePlaceholder.classList.remove('hidden');
-  elements.consoleLogs.classList.add('hidden');
-  elements.consoleLogs.innerHTML = '';
-}
-
-function runSimulation() {
-  if (state.isRunning) return;
-  state.isRunning = true;
-  updateRunButton();
-  
-  // Init Console UI
-  elements.consolePlaceholder.classList.add('hidden');
-  elements.consoleLogs.classList.remove('hidden');
-  elements.consoleLogs.innerHTML = '';
-  addLog('> プログラムを実行中...', true);
-  
-  const level = LEVELS.find(l => l.id === state.currentLevelId);
-  
-  setTimeout(() => {
     try {
       if (level.simulationType === 'basic') {
         let count = 0;
@@ -280,6 +58,8 @@ function runSimulation() {
           const kekka = Math.floor(Math.random() * 100);
           addLog(String(kekka));
           if (kekka === 0) count++;
+          // 少しずつ表示するための遅延（処理落ちしない程度に）
+          if (i % 20 === 0) await new Promise(r => setTimeout(r, 10));
         }
         addLog(`当たり回数： ${count}`);
       } 
@@ -291,6 +71,7 @@ function runSimulation() {
           kiroku.push(kekka);
           if (kekka === 0) count++;
         }
+        // リスト表示は見やすく整形
         addLog(`[${kiroku.join(', ')}]`);
         addLog(`当たり回数： ${count}`);
       }
@@ -325,38 +106,319 @@ function runSimulation() {
     } catch (e) {
       addLog(`Error: ${e.message}`, true);
     } finally {
-      state.isRunning = false;
-      updateRunButton();
-      elements.consoleOutput.scrollTop = elements.consoleOutput.scrollHeight;
+      setIsRunning(false);
     }
-  }, 500);
-}
+  };
 
-function addLog(text, isSystem = false) {
-  const div = document.createElement('div');
-  div.className = `break-all ${isSystem ? 'text-yellow-400' : 'text-slate-300'}`;
-  div.textContent = text;
-  elements.consoleLogs.appendChild(div);
-}
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 shadow-sm mt-6 overflow-hidden flex flex-col">
+      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h3 className="font-semibold text-slate-700">実行結果シミュレーター</h3>
+        <button 
+          onClick={runSimulation}
+          disabled={isRunning}
+          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isRunning ? '実行中...' : <><Play size={16} /> 実行する</>}
+        </button>
+      </div>
+      <div className="p-0 bg-slate-950 font-mono text-sm h-64 overflow-y-auto custom-scrollbar relative">
+        {logs.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+            <RotateCcw size={24} />
+            <p>「実行する」ボタンを押してシミュレーションを開始</p>
+          </div>
+        ) : (
+          <div className="p-4 flex flex-col gap-1">
+            {logs.map((log) => (
+              <div key={log.id} className={`break-all ${log.isSystem ? 'text-yellow-400' : 'text-slate-300'}`}>
+                {log.text}
+              </div>
+            ))}
+            <div ref={consoleEndRef} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
-function updateRunButton() {
-  if (state.isRunning) {
-    elements.runSimulationBtn.textContent = '実行中...';
-    elements.runSimulationBtn.disabled = true;
-  } else {
-    elements.runSimulationBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i> 実行する';
-    elements.runSimulationBtn.disabled = false;
-    lucide.createIcons();
-  }
-}
+const App = () => {
+  const [currentLevelId, setCurrentLevelId] = useState(1);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [medals, setMedals] = useState(5);
+  const [secondsUntilNext, setSecondsUntilNext] = useState(120);
+  const [unlockedHints, setUnlockedHints] = useState({});
+  const [expandedHints, setExpandedHints] = useState({});
 
-// Event Listeners
-function setupEventListeners() {
-  elements.mobileMenuBtn.onclick = toggleSidebar;
-  elements.sidebarCloseBtn.onclick = closeSidebar;
-  elements.sidebarOverlay.onclick = closeSidebar;
-  elements.runSimulationBtn.onclick = runSimulation;
-}
+  const currentLevel = LEVELS.find(l => l.id === currentLevelId) || LEVELS[0];
 
-// Start App
-init();
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsUntilNext((prev) => {
+        if (prev <= 1) {
+          setMedals((m) => m + 1);
+          return 120;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleLevelChange = (id) => {
+    setCurrentLevelId(id);
+    setIsSidebarOpen(false);
+    setExpandedHints({});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleHintClick = (hintId, cost = 1) => {
+    const isUnlocked = unlockedHints[hintId];
+
+    if (isUnlocked) {
+      setExpandedHints(prev => ({ ...prev, [hintId]: !prev[hintId] }));
+    } else {
+      if (medals >= cost) {
+        const confirmUse = window.confirm(
+          `ヒントメダルを${cost}枚消費してヒントを開きますか？\n(残りメダル: ${medals}枚)`
+        );
+        if (confirmUse) {
+          setMedals(prev => prev - cost);
+          setUnlockedHints(prev => ({ ...prev, [hintId]: true }));
+          setExpandedHints(prev => ({ ...prev, [hintId]: true }));
+        }
+      } else {
+        alert(`ヒントメダルが足りません！\nあと ${formatTime(secondsUntilNext)} で回復します。`);
+      }
+    }
+  };
+
+  const formatMarkdown = (text) => {
+    // 簡易的なMarkdownフォーマッタ (コードブロックとインラインコードのみ対応)
+    const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('```')) {
+        const code = part.replace(/```(python)?\n?/, '').replace(/```$/, '');
+        return (
+          <div key={index} className="my-2 bg-slate-800 text-slate-100 p-3 rounded-md font-mono text-xs overflow-x-auto whitespace-pre">
+            {code}
+          </div>
+        );
+      } else if (part.startsWith('`')) {
+        return (
+          <code key={index} className="bg-slate-100 px-1 py-0.5 rounded text-slate-800 font-mono text-xs">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      return <span key={index} className="whitespace-pre-wrap">{part}</span>;
+    });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row font-sans text-slate-900">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-white border-b border-slate-200 p-4 sticky top-0 z-20">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="font-bold text-slate-800 flex items-center gap-2">
+            <Code2 className="text-blue-600" />
+            ガチャ演習
+          </h1>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-md"
+          >
+            {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+        <div className="flex items-center justify-between bg-slate-100 rounded-lg p-2 text-sm">
+          <div className="flex items-center gap-2 text-amber-600 font-bold">
+            <Medal size={18} />
+            <span>× {medals}</span>
+          </div>
+          <div className="flex items-center gap-2 text-slate-500">
+            <Timer size={16} />
+            <span>回復まで {formatTime(secondsUntilNext)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Sidebar */}
+      <aside 
+        className={`
+          fixed md:sticky top-0 left-0 h-screen w-64 bg-slate-900 text-slate-100 z-30 transition-transform duration-300 ease-in-out flex flex-col
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          md:h-screen md:top-0
+        `}
+      >
+        <div className="p-6 border-b border-slate-800">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Code2 className="text-blue-400" />
+            ガチャ演習
+          </h1>
+          <p className="text-xs text-slate-400 mt-2">Pythonプログラミング</p>
+        </div>
+
+        <div className="p-4 bg-slate-800 border-b border-slate-700">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between text-amber-400 font-bold">
+              <div className="flex items-center gap-2">
+                <Medal size={20} />
+                <span>ヒントメダル</span>
+              </div>
+              <span className="text-xl">{medals}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/50 p-2 rounded">
+              <span className="flex items-center gap-1">
+                <Timer size={12} /> 次のメダル
+              </span>
+              <span className="font-mono">{formatTime(secondsUntilNext)}</span>
+            </div>
+          </div>
+        </div>
+        
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {LEVELS.map((level) => (
+            <button
+              key={level.id}
+              onClick={() => handleLevelChange(level.id)}
+              className={`
+                w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-between group
+                ${currentLevelId === level.id 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
+              `}
+            >
+              <span>Lv.{level.id} {level.shortLabel}</span>
+              {currentLevelId === level.id && <ChevronRight size={16} />}
+            </button>
+          ))}
+        </nav>
+        
+        <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+          プログラミング演習教材
+        </div>
+      </aside>
+
+      {/* Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 bg-slate-50 p-6 md:p-10 overflow-y-auto h-auto min-h-screen">
+        <div className="max-w-4xl mx-auto space-y-8">
+          
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold uppercase tracking-wider">
+              Level {currentLevel.id}
+            </div>
+            <h2 className="text-3xl font-bold text-slate-900">{currentLevel.title}</h2>
+            <p className="text-lg text-slate-600 leading-relaxed">
+              {currentLevel.description}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+              <CheckCircle2 className="text-emerald-500" size={20} />
+              達成目標
+            </h3>
+            <ul className="space-y-3">
+              {currentLevel.goals.map((goal, idx) => (
+                <li key={idx} className="flex items-start gap-3 text-slate-600">
+                  <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-slate-300 mt-2.5" />
+                  <span>{goal}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <ConsoleSimulator level={currentLevel} />
+
+          <div className="space-y-4 pb-12">
+            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Lightbulb className="text-amber-500" size={20} />
+              ヒント（メダルを使って解放）
+            </h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              {currentLevel.hints.map((hint, idx) => {
+                const hintId = `l${currentLevel.id}-h${idx}`;
+                const isUnlocked = unlockedHints[hintId];
+                const isExpanded = expandedHints[hintId];
+                const cost = hint.cost || 1;
+                
+                return (
+                  <div 
+                    key={idx} 
+                    className={`
+                      border rounded-lg transition-all duration-300 overflow-hidden relative
+                      ${isExpanded ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}
+                      ${!isUnlocked && 'hover:border-blue-300'}
+                    `}
+                  >
+                    <button
+                      onClick={() => handleHintClick(hintId, cost)}
+                      className="w-full text-left px-5 py-4 flex items-center justify-between font-medium text-slate-700"
+                    >
+                      <span className="flex items-center gap-2">
+                        {isUnlocked ? (
+                          <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                            <Unlock size={14} />
+                          </span>
+                        ) : (
+                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                            <Lock size={14} />
+                          </span>
+                        )}
+                        <span className={!isUnlocked ? 'text-slate-500' : 'text-slate-800'}>
+                          {hint.title}
+                        </span>
+                      </span>
+                      
+                      {isUnlocked ? (
+                        <ChevronDown 
+                          size={16} 
+                          className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-amber-500' : 'text-slate-400'}`} 
+                        />
+                      ) : (
+                        <div className="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-600">
+                          <Medal size={12} className="text-amber-500" />
+                          <span>-{cost}</span>
+                        </div>
+                      )}
+                    </button>
+                    
+                    <div 
+                      className={`
+                        px-5 overflow-hidden transition-all duration-300 ease-in-out
+                        ${isExpanded ? 'max-h-96 pb-4 opacity-100' : 'max-h-0 opacity-0'}
+                      `}
+                    >
+                      <div className="text-sm text-slate-600 leading-relaxed pl-8 border-l-2 border-amber-200 ml-3">
+                        {formatMarkdown(hint.content)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+const root = createRoot(document.getElementById('root'));
+root.render(<App />);
