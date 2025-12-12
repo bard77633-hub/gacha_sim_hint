@@ -55,9 +55,7 @@ const App: React.FC = () => {
   const handleLevelChange = (id: number) => {
     setCurrentLevelId(id);
     setIsSidebarOpen(false);
-    // レベル変更時にヒントの開閉状態と解放状態をリセットするかどうか
-    // ここではレベルごとにヒントが異なるため、リセットする挙動にします
-    setUnlockedHints({});
+    // ヒントの開閉状態のみリセットし、解放状態(unlockedHints)は保持する
     setExpandedHints({});
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -253,7 +251,7 @@ const App: React.FC = () => {
                           </span>
                         )}
                         <span className={!isUnlocked ? 'text-slate-500' : 'text-slate-800'}>
-                          {isUnlocked ? hint.title : `ヒント ${idx + 1} を開く`}
+                          {hint.title}
                         </span>
                       </span>
                       
