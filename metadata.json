@@ -1,0 +1,5 @@
+{
+  "name": "Gacha Coding Challenge",
+  "description": "An interactive learning platform for students to build a Gacha simulator in Python, featuring progressive levels and hints.",
+  "requestFramePermissions": []
+}
