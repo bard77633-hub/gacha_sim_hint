@@ -301,7 +301,7 @@ const ConsoleSimulator = ({ level }) => {
 const App = () => {
   const [currentLevelId, setCurrentLevelId] = useState(1);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [medals, setMedals] = useState(3); // Changed from 5 to 3
+  const [medals, setMedals] = useState(3); // Initial medals set to 3
   const [secondsUntilNext, setSecondsUntilNext] = useState(120);
   const [unlockedHints, setUnlockedHints] = useState({});
   const [expandedHints, setExpandedHints] = useState({});
@@ -356,7 +356,7 @@ const App = () => {
   };
 
   const formatMarkdown = (text) => {
-    // 簡易的なMarkdownフォーマッタ
+    // Simple markdown formatter
     const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
     return parts.map((part, index) => {
       if (part.startsWith('```')) {

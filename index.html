@@ -21,14 +21,50 @@
     }
   </script>
 
+  <!-- Error Handler for White Screen Debugging -->
+  <script>
+    window.addEventListener('error', function(event) {
+      const errorDisplay = document.getElementById('error-display') || document.createElement('div');
+      errorDisplay.id = 'error-display';
+      errorDisplay.style.position = 'fixed';
+      errorDisplay.style.top = '0';
+      errorDisplay.style.left = '0';
+      errorDisplay.style.width = '100%';
+      errorDisplay.style.backgroundColor = '#fee2e2';
+      errorDisplay.style.color = '#991b1b';
+      errorDisplay.style.padding = '1rem';
+      errorDisplay.style.zIndex = '9999';
+      errorDisplay.style.fontFamily = 'monospace';
+      errorDisplay.style.whiteSpace = 'pre-wrap';
+      errorDisplay.innerHTML += '<strong>JS Error:</strong> ' + event.message + '\n';
+      document.body.appendChild(errorDisplay);
+    });
+    
+    window.addEventListener('unhandledrejection', function(event) {
+      const errorDisplay = document.getElementById('error-display') || document.createElement('div');
+      errorDisplay.id = 'error-display';
+      errorDisplay.style.position = 'fixed';
+      errorDisplay.style.top = '0';
+      errorDisplay.style.left = '0';
+      errorDisplay.style.width = '100%';
+      errorDisplay.style.backgroundColor = '#fee2e2';
+      errorDisplay.style.color = '#991b1b';
+      errorDisplay.style.padding = '1rem';
+      errorDisplay.style.zIndex = '9999';
+      errorDisplay.style.fontFamily = 'monospace';
+      errorDisplay.innerHTML += '<strong>Promise Error:</strong> ' + event.reason + '\n';
+      document.body.appendChild(errorDisplay);
+    });
+  </script>
+
   <!-- Import Maps for React 19 -->
   <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@19.0.0",
+    "react": "https://esm.sh/react@19?dev",
+    "react-dom/client": "https://esm.sh/react-dom@19/client?dev",
+    "react-dom": "https://esm.sh/react-dom@19?dev",
+    "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@19",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
