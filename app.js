@@ -299,16 +299,70 @@ const ConsoleSimulator = ({ level }) => {
 };
 
 const App = () => {
-  const [currentLevelId, setCurrentLevelId] = useState(1);
+  // State Initialization with LocalStorage Persistence
+  const [currentLevelId, setCurrentLevelId] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    const saved = localStorage.getItem('gacha-current-level');
+    return saved !== null ? parseInt(saved, 10) : 1;
+  });
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [medals, setMedals] = useState(3);
-  const [secondsUntilNext, setSecondsUntilNext] = useState(120);
-  const [unlockedHints, setUnlockedHints] = useState({});
-  const [expandedHints, setExpandedHints] = useState({});
-  const [level1AllHintsUnlockedTime, setLevel1AllHintsUnlockedTime] = useState(null);
+  
+  const [medals, setMedals] = useState(() => {
+    if (typeof window === 'undefined') return 3;
+    const saved = localStorage.getItem('gacha-medals');
+    return saved !== null ? parseInt(saved, 10) : 3;
+  });
 
-  const currentLevel = LEVELS.find(l => l.id === currentLevelId) || LEVELS[0];
+  const [secondsUntilNext, setSecondsUntilNext] = useState(() => {
+    if (typeof window === 'undefined') return 120;
+    const saved = localStorage.getItem('gacha-timer');
+    return saved !== null ? parseInt(saved, 10) : 120;
+  });
 
+  const [unlockedHints, setUnlockedHints] = useState(() => {
+    if (typeof window === 'undefined') return {};
+    const saved = localStorage.getItem('gacha-unlocked-hints');
+    try {
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error('Failed to parse unlocked hints', e);
+      return {};
+    }
+  });
+
+  const [expandedHints, setExpandedHints] = useState({}); // Expanded state doesn't need persistence usually
+
+  const [level1AllHintsUnlockedTime, setLevel1AllHintsUnlockedTime] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const saved = localStorage.getItem('gacha-l1-complete-time');
+    return saved !== null ? parseInt(saved, 10) : null;
+  });
+
+  // Effects for Data Persistence
+  useEffect(() => {
+    localStorage.setItem('gacha-current-level', currentLevelId.toString());
+  }, [currentLevelId]);
+
+  useEffect(() => {
+    localStorage.setItem('gacha-medals', medals.toString());
+  }, [medals]);
+
+  useEffect(() => {
+    localStorage.setItem('gacha-timer', secondsUntilNext.toString());
+  }, [secondsUntilNext]);
+
+  useEffect(() => {
+    localStorage.setItem('gacha-unlocked-hints', JSON.stringify(unlockedHints));
+  }, [unlockedHints]);
+
+  useEffect(() => {
+    if (level1AllHintsUnlockedTime !== null) {
+      localStorage.setItem('gacha-l1-complete-time', level1AllHintsUnlockedTime.toString());
+    }
+  }, [level1AllHintsUnlockedTime]);
+
+  // Timer Logic
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsUntilNext((prev) => {
@@ -321,6 +375,8 @@ const App = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const currentLevel = LEVELS.find(l => l.id === currentLevelId) || LEVELS[0];
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
